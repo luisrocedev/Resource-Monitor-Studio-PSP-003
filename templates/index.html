@@ -3,68 +3,128 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Resource Monitor Studio · PSP</title>
+  <meta name="description" content="Resource Monitor Studio — monitorización de CPU, RAM, disco, red y procesos con alertas, gráficas Chart.js y persistencia SQLite." />
+  <title>Resource Monitor Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/styles.css" />
+  <noscript><p style="padding:2rem;text-align:center">Activa JavaScript para usar Resource Monitor Studio.</p></noscript>
 </head>
 <body>
   <main class="shell">
-    <section class="panel hero">
-      <div>
+    <!-- ── Header ── -->
+    <header class="panel hero">
+      <div class="hero-left">
         <h1>Resource Monitor Studio</h1>
-        <p>Monitorización periódica de CPU, RAM, disco y procesos con histórico en SQLite y visualización gráfica.</p>
+        <p>Monitorización en tiempo real de CPU, RAM, disco, red y procesos · SQLite · Chart.js</p>
       </div>
-      <div class="badge">Muestreo inicial: <strong id="sampleBadge">{{ sample_seconds }}s</strong></div>
-    </section>
+      <div class="hero-actions">
+        <span class="status-dot" id="statusDot" title="Estado del muestreo"></span>
+        <span class="status-text" id="statusText">Activo</span>
+        <button class="icon-btn" id="exportBtn" title="Exportar JSON">📥</button>
+        <button class="icon-btn" id="importBtn" title="Importar JSON">📤</button>
+        <input type="file" id="importFile" accept=".json" hidden />
+        <button class="icon-btn" id="darkModeBtn" title="Modo oscuro">🌙</button>
+      </div>
+    </header>
 
+    <!-- ── KPI strip (6) ── -->
     <section class="kpis">
-      <article class="kpi"><span>Muestras</span><strong id="kpiSamples">0</strong></article>
-      <article class="kpi"><span>CPU actual</span><strong id="kpiCpu">0%</strong></article>
-      <article class="kpi"><span>RAM actual</span><strong id="kpiRam">0%</strong></article>
-      <article class="kpi"><span>Alertas críticas</span><strong id="kpiCritical">0</strong></article>
+      <article class="kpi kpi-blue"><span>Muestras</span><strong id="kpiSamples">0</strong></article>
+      <article class="kpi kpi-cyan"><span>CPU actual</span><strong id="kpiCpu">0 %</strong></article>
+      <article class="kpi kpi-green"><span>RAM actual</span><strong id="kpiRam">0 %</strong></article>
+      <article class="kpi kpi-amber"><span>Disco</span><strong id="kpiDisk">0 %</strong></article>
+      <article class="kpi kpi-violet"><span>Procesos</span><strong id="kpiProcesses">0</strong></article>
+      <article class="kpi kpi-red"><span>Alertas críticas</span><strong id="kpiCritical">0</strong></article>
     </section>
 
-    <section class="panel controls">
-      <h2>Control de monitorización</h2>
-      <div class="row">
-        <button id="pauseBtn">Pausar</button>
-        <button id="resumeBtn" class="secondary">Reanudar</button>
-        <label>Intervalo (s)
-          <input id="intervalInput" type="number" min="0.5" max="60" step="0.5" value="{{ sample_seconds }}" />
-        </label>
-        <button id="applyIntervalBtn" class="secondary">Aplicar intervalo</button>
-        <span id="runtimeState" class="state">Estado: activo</span>
-      </div>
-    </section>
+    <!-- ── Tabs ── -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="tab-dashboard">Dashboard</button>
+      <button class="tab" data-tab="tab-alerts">Alertas</button>
+      <button class="tab" data-tab="tab-control">Control</button>
+    </nav>
 
-    <section class="panel charts">
-      <div>
-        <h2>Serie temporal (muestras recientes)</h2>
-        <canvas id="lineChart"></canvas>
-      </div>
-      <div>
-        <h2>Promedios agregados</h2>
-        <div class="subcontrols">
-          <button id="hourBtn" class="mini active">Por hora</button>
-          <button id="dayBtn" class="mini">Por día</button>
+    <!-- ── Tab: Dashboard ── -->
+    <div class="tab-content active" id="tab-dashboard">
+      <section class="panel charts">
+        <div>
+          <h2>Serie temporal (muestras recientes)</h2>
+          <canvas id="lineChart"></canvas>
         </div>
-        <canvas id="barChart"></canvas>
-      </div>
-    </section>
+        <div>
+          <h2>Promedios agregados</h2>
+          <div class="subcontrols">
+            <button id="hourBtn" class="mini active">Por hora</button>
+            <button id="dayBtn" class="mini">Por día</button>
+          </div>
+          <canvas id="barChart"></canvas>
+        </div>
+      </section>
+    </div>
 
-    <section class="panel">
-      <h2>Alertas registradas</h2>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th><th>Fecha</th><th>Severidad</th><th>Motivo</th><th>Valor</th><th>Umbral</th>
-            </tr>
-          </thead>
-          <tbody id="alertsBody"></tbody>
-        </table>
+    <!-- ── Tab: Alertas ── -->
+    <div class="tab-content" id="tab-alerts">
+      <section class="panel">
+        <h2>Alertas registradas</h2>
+        <div class="alert-filters">
+          <input type="text" id="alertSearch" placeholder="Buscar alerta…" />
+          <select id="alertSevFilter">
+            <option value="">Todas</option>
+            <option value="warning">Warning</option>
+            <option value="critical">Critical</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th><th>Fecha</th><th>Severidad</th><th>Motivo</th><th>Valor</th><th>Umbral</th>
+              </tr>
+            </thead>
+            <tbody id="alertsBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- ── Tab: Control ── -->
+    <div class="tab-content" id="tab-control">
+      <section class="panel controls">
+        <h2>Control de monitorización</h2>
+        <div class="row">
+          <button id="pauseBtn">⏸️ Pausar</button>
+          <button id="resumeBtn" class="secondary">▶️ Reanudar</button>
+          <label>Intervalo (s)
+            <input id="intervalInput" type="number" min="0.5" max="60" step="0.5" value="{{ sample_seconds }}" />
+          </label>
+          <button id="applyIntervalBtn" class="secondary">Aplicar</button>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button id="spikeBtn" class="btn-warning">🔥 Simular pico CPU</button>
+          <span class="state" id="runtimeState">Estado: activo</span>
+        </div>
+      </section>
+    </div>
+
+    <!-- ── Toast container ── -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- ── Confirm dialog ── -->
+    <div id="confirmOverlay" class="confirm-overlay hidden">
+      <div class="confirm-box">
+        <h3 id="confirmTitle">Confirmar</h3>
+        <p id="confirmMsg"></p>
+        <div class="confirm-actions">
+          <button id="confirmOk" class="btn-primary">Aceptar</button>
+          <button id="confirmCancel" class="secondary">Cancelar</button>
+        </div>
       </div>
-    </section>
+    </div>
   </main>
+
+  <footer class="app-footer">Resource Monitor Studio · Luis Adolfo Roces Dapena · DAM2</footer>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="/static/app.js"></script>
